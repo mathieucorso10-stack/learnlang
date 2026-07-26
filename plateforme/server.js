@@ -320,12 +320,15 @@ app.get(
     const lessonCount = (await db.get('SELECT COUNT(*) c FROM lessons')).c;
     const questionCount = (await db.get('SELECT COUNT(*) c FROM questions')).c;
     const mostMissed = await db.all(
-      `SELECT q.id, q.prompt, l.title as "lessonTitle",
-              SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END) as misses,
-              COUNT(*) as attempts,
-              (1.0 * SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END) / COUNT(*)) as "missRate"
-       FROM attempts a JOIN questions q ON q.id = a.question_id JOIN lessons l ON l.id = q.lesson_id
-       GROUP BY q.id, q.prompt, l.title HAVING COUNT(*) >= 2
+      `SELECT * FROM (
+         SELECT q.id, q.prompt, l.title as "lessonTitle",
+                SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END) as misses,
+                COUNT(*) as attempts,
+                (1.0 * SUM(CASE WHEN a.correct = 0 THEN 1 ELSE 0 END) / COUNT(*)) as "missRate"
+         FROM attempts a JOIN questions q ON q.id = a.question_id JOIN lessons l ON l.id = q.lesson_id
+         GROUP BY q.id, q.prompt, l.title
+       ) sub
+       WHERE attempts >= 2
        ORDER BY "missRate" DESC, attempts DESC
        LIMIT 10`
     );
