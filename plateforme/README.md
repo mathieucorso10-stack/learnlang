@@ -1,9 +1,9 @@
 # 🌐 LearnLang
 
 Une plateforme de cours de langues **multi-utilisateurs** et **multi-langues**,
-avec répétition espacée. Développée pour un francophone débutant, avec deux
-cours complets prêts à l'emploi : **Español** (10 leçons) et **English**
-(10 leçons).
+avec répétition espacée. Développée pour un francophone débutant, avec trois
+cours complets prêts à l'emploi : **Español** (10 leçons), **English**
+(10 leçons) et **Italiano** (10 leçons).
 
 ## ✨ Fonctionnalités
 
@@ -188,9 +188,10 @@ plateforme/
 ├── .env.example             # Modèle de configuration (DATABASE_URL, SESSION_SECRET)
 ├── seed/
 │   ├── seed_spanish.js      # Importe le cours espagnol de base (leçons 1-6)
-│   ├── extend_courses.js    # Ajoute ES 7-10 + tout le cours English (idempotent)
+│   ├── extend_courses.js    # Ajoute ES 7-10 + cours English + cours Italiano (idempotent)
 │   ├── content_es_extra.js  # Contenu des leçons espagnoles 7-10
-│   └── content_en.js        # Contenu complet du cours d'anglais
+│   ├── content_en.js        # Contenu complet du cours d'anglais
+│   └── content_it.js        # Contenu complet du cours d'italien
 ├── public/
 │   ├── index.html           # Page de connexion
 │   ├── style.css             # Design system (couleurs, typographie, composants)

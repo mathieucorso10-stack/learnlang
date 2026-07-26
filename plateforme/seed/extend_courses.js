@@ -4,6 +4,7 @@ const db = require('../db');
 const srs = require('../srs');
 const esExtra = require('./content_es_extra');
 const en = require('./content_en');
+const it = require('./content_it');
 
 async function insertQuestions(lessonId, questions) {
   for (let i = 0; i < questions.length; i++) {
@@ -81,6 +82,23 @@ async function run() {
   ])).m;
   const { added: addedEn, totalQ: totalQEn } = await addLessonsToLanguage(enLang.id, en.LESSONS, Number(currentMaxEn) + 1);
   console.log(`Anglais : ${addedEn} nouvelle(s) leçon(s), ${totalQEn} nouvelles questions.\n`);
+
+  console.log('--- Création / mise à jour du cours italien ---');
+  let itLang = await db.get(`SELECT id FROM languages WHERE code = 'it'`);
+  if (!itLang) {
+    const langPosIt = Number((await db.get(`SELECT COALESCE(MAX(position), -1) as m FROM languages`)).m) + 1;
+    const infoIt = await db.run(
+      `INSERT INTO languages (code, name, flag_emoji, position, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      ['it', 'Italiano', '🇮🇹', langPosIt, srs.nowTimestamp()]
+    );
+    itLang = { id: infoIt.id };
+    console.log('Langue "Italiano" créée.');
+  }
+  const currentMaxIt = (await db.get(`SELECT COALESCE(MAX(position), -1) as m FROM lessons WHERE language_id = ?`, [
+    itLang.id,
+  ])).m;
+  const { added: addedIt, totalQ: totalQIt } = await addLessonsToLanguage(itLang.id, it.LESSONS, Number(currentMaxIt) + 1);
+  console.log(`Italien : ${addedIt} nouvelle(s) leçon(s), ${totalQIt} nouvelles questions.\n`);
 
   // Résumé final — purement informatif, ne doit jamais faire échouer le seed.
   try {
