@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
+const srs = require('../srs');
 
 const COURSE_ROOT = path.join(__dirname, '..', '..'); // dossier "COURS D'ESPAGNOL"
 
@@ -84,78 +85,80 @@ function extractMcqQuestions(quizHtmlPath) {
   }));
 }
 
-function run() {
-  const insertLanguage = db.prepare(
-    `INSERT INTO languages (code, name, flag_emoji, position) VALUES (?, ?, ?, ?)`
-  );
-  const insertLesson = db.prepare(
-    `INSERT INTO lessons (language_id, position, title, content_md) VALUES (?, ?, ?, ?)`
-  );
-  const insertQuestion = db.prepare(
-    `INSERT INTO questions (lesson_id, position, type, prompt, options_json, accepted_answers_json, explanation)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  );
+async function run() {
+  await db.initSchema();
 
-  const existing = db.prepare('SELECT id FROM languages WHERE code = ?').get('es');
+  const existing = await db.get('SELECT id FROM languages WHERE code = ?', ['es']);
   if (existing) {
     console.log('La langue espagnole est déjà présente (id=' + existing.id + '), seed ignoré.');
-    console.log('Pour tout réimporter : supprime plateforme/data/learnlang.db puis relance npm run seed.');
+    console.log('Pour tout réimporter : vide la base puis relance npm run seed.');
     return;
   }
 
-  const langId = insertLanguage.run('es', 'Español', '🇪🇸', 0).lastInsertRowid;
+  const lang = await db.run(
+    `INSERT INTO languages (code, name, flag_emoji, position, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    ['es', 'Español', '🇪🇸', 0, srs.nowTimestamp()]
+  );
+  const langId = lang.id;
 
   let totalQuestions = 0;
-  LESSON_DIRS.forEach((dir, i) => {
+  for (let i = 0; i < LESSON_DIRS.length; i++) {
+    const dir = LESSON_DIRS[i];
     const lessonPath = path.join(COURSE_ROOT, dir);
     const mdPath = path.join(lessonPath, 'lecon.md');
     const quizPath = path.join(lessonPath, 'quiz.html');
     const contentMd = fs.readFileSync(mdPath, 'utf8');
 
-    const lessonId = insertLesson.run(langId, i, LESSON_TITLES[dir], contentMd).lastInsertRowid;
+    const lessonRow = await db.run(
+      `INSERT INTO lessons (language_id, position, title, content_md, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      [langId, i, LESSON_TITLES[dir], contentMd, srs.nowTimestamp()]
+    );
+    const lessonId = lessonRow.id;
 
     let pos = 0;
     const mcqQuestions = extractMcqQuestions(quizPath);
-    mcqQuestions.forEach((q) => {
-      insertQuestion.run(
-        lessonId,
-        pos++,
-        'mcq',
-        q.prompt,
-        JSON.stringify(q.options),
-        JSON.stringify([q.correct]),
-        q.explanation
+    for (const q of mcqQuestions) {
+      await db.run(
+        `INSERT INTO questions (lesson_id, position, type, prompt, options_json, accepted_answers_json, explanation, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [lessonId, pos++, 'mcq', q.prompt, JSON.stringify(q.options), JSON.stringify([q.correct]), q.explanation, srs.nowTimestamp()]
       );
       totalQuestions++;
-    });
+    }
 
-    (TYPED_QUESTIONS[dir] || []).forEach((q) => {
-      insertQuestion.run(
-        lessonId,
-        pos++,
-        'typed',
-        q.prompt,
-        null,
-        JSON.stringify(q.answers),
-        q.explanation
+    for (const q of TYPED_QUESTIONS[dir] || []) {
+      await db.run(
+        `INSERT INTO questions (lesson_id, position, type, prompt, options_json, accepted_answers_json, explanation, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [lessonId, pos++, 'typed', q.prompt, null, JSON.stringify(q.answers), q.explanation, srs.nowTimestamp()]
       );
       totalQuestions++;
-    });
+    }
 
     console.log(`Leçon "${LESSON_TITLES[dir]}" importée : ${pos} questions.`);
-  });
+  }
 
   console.log(`\nTotal : 1 langue, ${LESSON_DIRS.length} leçons, ${totalQuestions} questions.`);
 
   // Compte admin par défaut — à changer après la première connexion.
-  const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
+  const adminExists = await db.get('SELECT id FROM users WHERE username = ?', ['admin']);
   if (!adminExists) {
     const hash = bcrypt.hashSync('espanol123', 10);
-    db.prepare(
-      `INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'admin')`
-    ).run('admin', hash, 'Mathieu');
+    await db.run(
+      `INSERT INTO users (username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, 'admin', ?)`,
+      ['admin', hash, 'Mathieu', srs.nowTimestamp()]
+    );
     console.log('\nCompte admin créé : identifiant "admin", mot de passe "espanol123" (à changer !).');
   }
 }
 
-run();
+module.exports = { run };
+
+if (require.main === module) {
+  run()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

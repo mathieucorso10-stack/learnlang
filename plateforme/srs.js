@@ -12,6 +12,19 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Décalage de jours non contraint (peut être négatif) — utilisé pour des calculs
+// généraux (ex: "hier"), contrairement à addDays() qui est spécifique au SRS
+// (toujours au moins +1 jour).
+function shiftDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + Math.round(days));
+  return d.toISOString().slice(0, 10);
+}
+
+function nowTimestamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
 function schedule(prev, correct) {
   const q = correct ? 4 : 2;
   let { ease_factor: ef, interval_days: interval, repetitions: reps } = prev;
@@ -37,4 +50,4 @@ function schedule(prev, correct) {
   };
 }
 
-module.exports = { schedule, today, addDays };
+module.exports = { schedule, today, addDays, shiftDays, nowTimestamp };

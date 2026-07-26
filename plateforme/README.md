@@ -1,12 +1,9 @@
 # 🌐 LearnLang
 
 Une plateforme de cours de langues **multi-utilisateurs** et **multi-langues**,
-avec répétition espacée, à faire tourner chez toi sur ton Mac. Pas de cloud,
-pas d'abonnement, pas de compte à créer ailleurs — juste Node.js et un
-fichier SQLite.
-
-Développée pour un francophone débutant, avec deux cours complets prêts à
-l'emploi : **Español** (10 leçons) et **English** (10 leçons).
+avec répétition espacée. Développée pour un francophone débutant, avec deux
+cours complets prêts à l'emploi : **Español** (10 leçons) et **English**
+(10 leçons).
 
 ## ✨ Fonctionnalités
 
@@ -22,17 +19,47 @@ l'emploi : **Español** (10 leçons) et **English** (10 leçons).
 - **Validation intelligente des réponses** : tolérante aux accents
   manquants (« presque, attention aux accents » plutôt qu'un simple faux),
   stricte sur tout le reste.
-- **Accès réseau local** : lance le serveur sur ton Mac, connecte-toi depuis
-  le téléphone ou un autre ordinateur sur le même wifi.
 - **Interface soignée** : anneaux de progression, tableau de bord clair,
   petite célébration (confettis 🎉) quand tu réussis bien un quiz.
+- **Base de données PostgreSQL** : la même base peut être utilisée en local
+  et en production — la progression est partagée, pas piégée sur un seul
+  Mac.
 
-## 🚀 Démarrage
+## 🗺️ Deux façons de l'utiliser
 
-Prérequis : [Node.js](https://nodejs.org) installé (version 18 ou plus).
+| | Local sur ton Mac | En ligne 24/7 (public) |
+|---|---|---|
+| Coût | Gratuit | Gratuit |
+| Comptes à créer | Supabase (base de données) | Supabase + Render + GitHub |
+| Disponibilité | Seulement quand ton Mac tourne | Toujours, même Mac éteint |
+| Mise en place | ~5 min | ~20 min |
+
+Les deux modes utilisent **la même base de données Postgres** (sur
+Supabase) — tu peux commencer en local et passer en ligne plus tard sans
+rien perdre.
+
+## 🚀 Démarrage en local
+
+Prérequis : [Node.js](https://nodejs.org) (version 18+) et un compte
+[Supabase](https://supabase.com) gratuit (aucune carte bancaire requise).
+
+### 1. Crée ta base de données (une seule fois)
+
+1. Crée un compte sur [supabase.com](https://supabase.com) et un nouveau projet.
+2. Dans **Project Settings → Database → Connection string**, copie l'URI
+   (commence par `postgresql://...`).
+
+### 2. Configure et lance LearnLang
 
 ```bash
 cd plateforme
+cp .env.example .env
+```
+
+Ouvre `.env` et colle ta chaîne de connexion Supabase dans `DATABASE_URL`.
+Puis :
+
+```bash
 npm install
 npm run seed
 npm run seed:extend
@@ -40,7 +67,7 @@ npm start
 ```
 
 - `npm install` : à faire une seule fois, installe les dépendances.
-- `npm run seed` : à faire une seule fois, crée la base et importe le cours d'espagnol.
+- `npm run seed` : à faire une seule fois, crée les tables et importe le cours d'espagnol.
 - `npm run seed:extend` : à faire une seule fois, ajoute les leçons 7-10 en espagnol et tout le cours d'anglais.
 - `npm start` : démarre le serveur (à refaire à chaque fois que tu veux relancer la plateforme).
 
@@ -56,7 +83,9 @@ Puis ouvre **http://localhost:4321** dans ton navigateur.
 - Mot de passe : `espanol123`
 
 ⚠️ Change ce mot de passe dès la première connexion (menu « Mot de passe »
-en haut à droite du tableau de bord).
+en haut à droite du tableau de bord) — c'est d'autant plus important que
+ta base est maintenant accessible depuis internet (même en usage local,
+Supabase héberge tes données).
 
 ### Accéder depuis un autre appareil (même wifi)
 
@@ -71,33 +100,64 @@ LearnLang lancé !
 Donne cette deuxième adresse à qui veut se connecter depuis son téléphone
 ou un autre ordinateur du foyer, tant que le serveur tourne sur ton Mac.
 
-### Accéder depuis internet, gratuitement (Cloudflare Tunnel)
+## 🌍 Déploiement public, gratuit, 24/7
 
-Pour que des gens en dehors de ton wifi puissent se connecter (pas
-seulement à la maison), sans payer d'hébergement et sans rien changer au
-code : double-clique sur **`Lancer LearnLang en public.command`** (dans
-ce dossier `plateforme/`).
+Pour que le site reste accessible même quand ton Mac est éteint, il faut
+l'héberger ailleurs. Voici la checklist complète — gratuite, sans carte
+bancaire, mais qui demande de créer 3 comptes toi-même (je ne peux pas le
+faire à ta place : ce sont TES comptes, avec TON email).
 
-Ça fait deux choses automatiquement :
-1. Démarre le serveur LearnLang (comme `npm start`).
-2. Ouvre un tunnel gratuit via [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
-   (`cloudflared`, déjà téléchargé dans `bin/`) qui donne une adresse
-   publique du type `https://un-nom-aleatoire.trycloudflare.com`.
+### Ce qu'il te reste à faire (~20 minutes, une seule fois)
 
-Cette adresse s'affiche dans le terminal qui s'ouvre — c'est celle-ci
-qu'il faut partager. Points à savoir :
+1. **Supabase** (si pas déjà fait ci-dessus) → crée ton projet, récupère
+   `DATABASE_URL`, lance `npm run seed` et `npm run seed:extend` en local
+   une fois pour peupler la base (voir démarrage en local ci-dessus).
 
-- **Gratuit, sans compte, sans carte bancaire.**
-- L'adresse **change à chaque relance** (pas de compte Cloudflare = pas
-  d'adresse fixe). Si tu veux une adresse stable qui ne change jamais, il
-  faudrait un compte Cloudflare gratuit + un nom de domaine (ça, en
-  revanche, coûte quelques euros par an).
-- Ton Mac doit rester **allumé et connecté à internet** pendant que des
-  gens l'utilisent — ferme la fenêtre du terminal (ou `Ctrl+C`) pour tout
-  arrêter proprement.
-- Comme le site devient accessible publiquement, assure-toi d'avoir
-  changé le mot de passe admin par défaut (voir plus haut) avant de
-  partager le lien.
+2. **GitHub** → crée un compte sur [github.com](https://github.com), puis
+   un nouveau dépôt (vide, sans README). Depuis le dossier du projet :
+   ```bash
+   git remote add origin https://github.com/TON-PSEUDO/learnlang.git
+   git push -u origin main
+   ```
+   (remplace l'URL par celle de ton dépôt — GitHub te la donne après
+   création)
+
+3. **Render** → crée un compte sur [render.com](https://render.com),
+   clique **New → Blueprint**, connecte ton dépôt GitHub. Render détecte
+   automatiquement `render.yaml` et propose de créer le service. Quand il
+   demande la valeur de `DATABASE_URL`, colle ta chaîne de connexion
+   Supabase. Clique **Deploy**.
+
+4. Après quelques minutes, Render te donne une adresse fixe du type
+   `https://learnlang.onrender.com` — **c'est celle-ci que tu partages**,
+   elle ne change jamais.
+
+### À savoir, honnêtement
+
+- Le service gratuit Render **s'endort après 15 minutes sans visite** et
+  met environ une minute à se réveiller au premier visiteur suivant —
+  normal, pas un bug.
+- La base Supabase gratuite **se met en pause après 7 jours sans aucune
+  activité** (mais ne perd jamais les données) — il suffit d'aller cliquer
+  « Restore » dans le tableau de bord Supabase si ça arrive.
+- Pour mettre à jour le site après une modification du code : `git push`
+  suffit, Render redéploie automatiquement.
+
+## 🛜 Alternative : tunnel gratuit depuis ton Mac (sans Render/GitHub)
+
+Si tu veux un accès public mais sans créer de compte Render/GitHub, et que
+ça ne te dérange pas que ton Mac reste allumé : double-clique sur
+**`Lancer LearnLang en public.command`** (dans ce dossier). Ça démarre le
+serveur et ouvre un tunnel [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+gratuit (`cloudflared`, déjà téléchargé dans `bin/`), qui donne une
+adresse publique temporaire du type `https://un-nom.trycloudflare.com`.
+
+- Gratuit, sans compte, sans carte bancaire.
+- L'adresse **change à chaque relance**.
+- Ton Mac doit rester **allumé et connecté** pendant que des gens
+  l'utilisent.
+- Nécessite quand même le compte Supabase (étape 1 ci-dessus), puisque
+  LearnLang utilise Postgres même en local désormais.
 
 ## 👤 Utilisation
 
@@ -120,25 +180,27 @@ un mot de passe, voir la progression de chacun).
 
 ```
 plateforme/
-├── server.js              # Serveur Express : auth, API REST, fichiers statiques
-├── db.js                  # Schéma SQLite (better-sqlite3)
-├── srs.js                 # Algorithme de répétition espacée (SM-2)
+├── server.js               # Serveur Express : auth, API REST, fichiers statiques
+├── db.js                   # Connexion PostgreSQL (pg), schéma, helpers async
+├── srs.js                  # Algorithme de répétition espacée (SM-2) + helpers de date
 ├── answercheck.js          # Validation des réponses (accents, ponctuation)
+├── render.yaml              # Config de déploiement Render (Blueprint)
+├── .env.example             # Modèle de configuration (DATABASE_URL, SESSION_SECRET)
 ├── seed/
-│   ├── seed_spanish.js     # Importe le cours espagnol de base (leçons 1-6)
-│   ├── extend_courses.js   # Ajoute ES 7-10 + tout le cours English (idempotent)
-│   ├── content_es_extra.js # Contenu des leçons espagnoles 7-10
-│   └── content_en.js       # Contenu complet du cours d'anglais
+│   ├── seed_spanish.js      # Importe le cours espagnol de base (leçons 1-6)
+│   ├── extend_courses.js    # Ajoute ES 7-10 + tout le cours English (idempotent)
+│   ├── content_es_extra.js  # Contenu des leçons espagnoles 7-10
+│   └── content_en.js        # Contenu complet du cours d'anglais
 ├── public/
-│   ├── index.html          # Page de connexion
-│   ├── style.css            # Design system (couleurs, typographie, composants)
-│   ├── app/                # Interface étudiant (tableau de bord, leçon, quiz)
-│   └── admin/               # Interface admin (sidebar + panneaux CRUD)
+│   ├── index.html           # Page de connexion
+│   ├── style.css             # Design system (couleurs, typographie, composants)
+│   ├── app/                 # Interface étudiant (tableau de bord, leçon, quiz)
+│   └── admin/                # Interface admin (sidebar + panneaux CRUD)
 ├── bin/
-│   └── cloudflared          # Binaire pour le tunnel public gratuit (voir plus haut)
-├── Lancer LearnLang en public.command   # Double-clic : serveur + tunnel public
-└── data/
-    └── learnlang.db         # Base SQLite (créée au premier `npm run seed`)
+│   └── cloudflared           # Binaire pour le tunnel public gratuit (voir plus haut)
+├── test/
+│   └── pgmem_smoke.js        # Test de bout en bout sans base réelle (voir plus bas)
+└── Lancer LearnLang en public.command   # Double-clic : serveur + tunnel public
 ```
 
 ## 🧠 Comment fonctionne la répétition espacée
@@ -169,24 +231,30 @@ titres de leçons existants avant d'insérer.
 
 ## 🛠️ Stack technique
 
-- **Backend** : Node.js, Express, [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
-  (base SQLite locale, un seul fichier)
-- **Auth** : sessions via `express-session`, mots de passe hashés avec
-  `bcryptjs`
+- **Backend** : Node.js, Express, [pg](https://node-postgres.com) (client PostgreSQL)
+- **Base de données** : PostgreSQL hébergé gratuitement sur [Supabase](https://supabase.com)
+- **Auth** : sessions via `express-session`, mots de passe hashés avec `bcryptjs`
 - **Frontend** : HTML/CSS/JS vanilla, aucun build step. Markdown des leçons
   rendu côté client avec [marked](https://marked.js.org).
 - **Polices** : Fraunces (titres) + Inter (texte), via Google Fonts.
+- **Déploiement** : [Render](https://render.com) (hébergement gratuit du serveur)
 
-Aucune donnée ne quitte ta machine — tout est stocké dans
-`data/learnlang.db`.
+## 🧪 Tester sans base de données réelle
+
+`npm run test:pgmem` fait tourner tout le cycle (création des tables,
+import des deux cours, démarrage du serveur) contre une base PostgreSQL
+**émulée en mémoire** (le paquet `pg-mem`), sans avoir besoin d'un vrai
+Supabase. Pratique pour vérifier que le code démarre correctement après
+une modification, avant de toucher à la vraie base.
 
 ## 🔒 Sauvegarder / réinitialiser tes données
 
-Toute la progression vit dans `data/learnlang.db`. Pour sauvegarder,
-copie ce fichier ailleurs. Pour repartir de zéro :
+Toute la progression vit dans ta base Supabase, pas sur ton disque —
+Supabase la sauvegarde automatiquement. Pour repartir totalement à zéro,
+le plus simple est de supprimer les tables depuis l'onglet **Table
+Editor** de Supabase (ou de créer un nouveau projet Supabase), puis :
 
 ```bash
-rm data/learnlang.db data/learnlang.db-shm data/learnlang.db-wal
 npm run seed
 npm run seed:extend
 ```
