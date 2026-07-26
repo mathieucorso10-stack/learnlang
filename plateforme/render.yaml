@@ -3,6 +3,7 @@ services:
     name: learnlang
     runtime: node
     plan: free
+    rootDir: plateforme
     buildCommand: npm install
     startCommand: npm start
     envVars:
