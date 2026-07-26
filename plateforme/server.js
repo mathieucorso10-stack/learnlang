@@ -9,6 +9,11 @@ const { checkTyped, checkMcq } = require('./answercheck');
 const app = express();
 const PORT = process.env.PORT || 4321;
 
+// Nécessaire derrière un proxy inverse (Render, etc.) pour que Express sache
+// que la requête d'origine était bien en HTTPS — sinon les cookies "secure"
+// ne sont pas reconnus et la session ne persiste pas.
+app.set('trust proxy', 1);
+
 // Enveloppe les routes async pour que les erreurs tombent proprement dans le
 // middleware d'erreur Express plutôt que de faire planter/pendre la requête.
 function ah(fn) {
