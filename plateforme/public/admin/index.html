@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>LearnLang — Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../style.css">
+<style>
+  body{background:linear-gradient(150deg,var(--bg-0),var(--bg-1) 70%);}
+  .admin-shell{display:flex; min-height:100vh; align-items:flex-start;}
+  .admin-sidebar{
+    width:240px; flex-shrink:0; position:sticky; top:0; height:100vh;
+    background:rgba(255,253,250,.75); backdrop-filter:blur(14px) saturate(1.4);
+    border-right:1px solid rgba(43,33,29,.07);
+    display:flex; flex-direction:column; padding:26px 18px;
+  }
+  .admin-sidebar .brand{
+    font-family:'Fraunces',serif; font-weight:700; font-size:1.15rem; padding:0 8px 22px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .admin-sidebar .tabs{flex-direction:column; gap:4px; margin-bottom:0;}
+  .admin-sidebar .tabs button{
+    justify-content:flex-start; text-align:left; box-shadow:none; background:transparent;
+    color:var(--ink-soft); font-weight:700; padding:12px 14px; border-radius:var(--radius-sm);
+  }
+  .admin-sidebar .tabs button:hover{background:var(--card-soft); color:var(--ink);}
+  .admin-sidebar .tabs button.active{
+    background:linear-gradient(135deg,var(--accent),var(--accent-strong)); color:#fff8f4; box-shadow:var(--shadow-glow);
+  }
+  .sidebar-spacer{flex:1;}
+  .sidebar-foot{border-top:1px solid rgba(43,33,29,.08); padding-top:16px; font-size:.85rem;}
+  .sidebar-foot .who{font-weight:700; margin-bottom:8px; color:var(--ink);}
+  .sidebar-foot a{display:block; padding:6px 0; color:var(--ink-soft); font-weight:600;}
+  .sidebar-foot a:hover{color:var(--accent-strong);}
+  .admin-main{flex:1; min-width:0; padding:36px 40px 80px;}
+  .admin-main .wrap{padding:0; margin:0; max-width:none;}
+  .stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:24px;}
+  .stat-card{text-align:center; padding:26px 16px;}
+  .stat-num{font-family:'Fraunces',serif; font-size:2.4rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--amber)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+</style>
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="brand">🌐 LearnLang</div>
+    <div class="tabs">
+      <button data-tab="overview" class="active">📊 Vue d'ensemble</button>
+      <button data-tab="languages">🌍 Langues</button>
+      <button data-tab="lessons">📚 Leçons</button>
+      <button data-tab="questions">❓ Questions</button>
+      <button data-tab="users">👥 Utilisateurs</button>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-foot">
+      <div class="who" id="whoami"></div>
+      <a href="/app/">→ Vue étudiant</a>
+      <a href="#" id="logoutLink">→ Déconnexion</a>
+    </div>
+  </aside>
+  <main class="admin-main">
+    <div class="wrap wide">
+      <div id="tab-overview" class="tab-panel"></div>
+      <div id="tab-languages" class="tab-panel" style="display:none"></div>
+      <div id="tab-lessons" class="tab-panel" style="display:none"></div>
+      <div id="tab-questions" class="tab-panel" style="display:none"></div>
+      <div id="tab-users" class="tab-panel" style="display:none"></div>
+    </div>
+  </main>
+</div>
+<script src="admin.js"></script>
+</body>
+</html>

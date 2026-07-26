@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Quiz — Articles et verbes réguliers</title>
+<style>
+  :root{--bg:#fdf6ec; --card:#ffffff; --accent:#d94f30; --accent2:#f2a922; --good:#3e8e5a; --bad:#c0392b; --text:#3a2e2a; --muted:#8a7a72;}
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:linear-gradient(135deg,#fdf6ec,#fbe8d3); color:var(--text); margin:0; padding:32px 16px; min-height:100vh;}
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-size:1.5rem;margin-bottom:4px;}
+  .sub{color:var(--muted);margin-bottom:24px;}
+  .card{background:var(--card); border-radius:16px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.08); margin-bottom:16px;}
+  .qnum{font-size:.85rem;color:var(--accent);font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;}
+  .qtext{font-size:1.15rem;font-weight:600;margin-bottom:16px;}
+  .opt{display:block; width:100%; text-align:left; padding:12px 16px; margin-bottom:10px; border-radius:10px; border:2px solid #eee2d5; background:#fffdf9; cursor:pointer; font-size:1rem; color:var(--text); transition:all .15s;}
+  .opt:hover{border-color:var(--accent2);}
+  .opt.correct{border-color:var(--good);background:#e7f5ec;}
+  .opt.incorrect{border-color:var(--bad);background:#fbe9e7;}
+  .explain{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f6f0e6;font-size:.95rem;display:none;}
+  .explain.show{display:block;}
+  .nextbtn, .restart{background:var(--accent); color:white; border:none; padding:12px 22px; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; margin-top:8px;}
+  .nextbtn:disabled{background:#e0d3c4;cursor:not-allowed;}
+  .progress{height:8px;background:#eee2d5;border-radius:4px;overflow:hidden;margin-bottom:24px;}
+  .progress-bar{height:100%;background:var(--accent2);width:0%;transition:width .3s;}
+  .score{text-align:center;}
+  .score h2{font-size:2.2rem;margin-bottom:8px;}
+  .score p{color:var(--muted);}
+  .emoji{font-size:3rem;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📚 Quiz — Articles et verbes réguliers</h1>
+  <div class="sub">Leçon 3 · 8 questions</div>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div id="quizArea"></div>
+</div>
+
+<script>
+const questions = [
+  { q:"Quel article accompagne « libro » (livre) ?", options:["la","el","los","las"], answer:1,
+    explain:"libro se termine en -o → masculin singulier → el libro." },
+  { q:"Comment forme-t-on le pluriel de « profesor » ?", options:["profesors","profesores","profesori","profesor"], answer:1,
+    explain:"Mot terminé par une consonne → on ajoute -es : profesores." },
+  { q:"Quelle est l'exception : « día » (jour) est en réalité...", options:["féminin","masculin malgré le -a final","neutre","toujours pluriel"], answer:1,
+    explain:"el día est masculin bien qu'il se termine en -a — une exception à connaître." },
+  { q:"Conjugue « hablar » à la 1re personne du singulier (yo) :", options:["hablas","hablo","habla","hablamos"], answer:1,
+    explain:"yo hablo = je parle. Verbe régulier en -ar, le groupe le plus fréquent." },
+  { q:"Quelle terminaison distingue -ER de -IR à la forme « nosotros » ?", options:["-emos vs -imos","-as vs -es","-o vs -e","aucune, c'est identique"], answer:0,
+    explain:"comemos (-ER) vs vivimos (-IR) : seule vraie différence entre ces deux groupes." },
+  { q:"Comment dit-on « Je ne parle pas espagnol » ?", options:["Hablo no español","No hablo español","Non hablo español","Hablo español no"], answer:1,
+    explain:"La négation se place juste avant le verbe : No hablo español (un seul mot suffit, contrairement au « ne...pas » français)." },
+  { q:"« Vivo en París » signifie :", options:["Je visite Paris","J'habite à Paris","Je viens de Paris","Je pars pour Paris"], answer:1,
+    explain:"vivir = vivre/habiter. Vivo en París = j'habite à Paris." },
+  { q:"Quel groupe de verbe est « escribir » (écrire) ?", options:["-AR","-ER","-IR","aucun, il est irrégulier"], answer:2,
+    explain:"escribir se termine en -ir, le troisième groupe de verbes réguliers." }
+];
+
+let current = 0, score = 0, answered = false;
+const quizArea = document.getElementById('quizArea');
+const progressBar = document.getElementById('progressBar');
+
+function render() {
+  progressBar.style.width = (current / questions.length * 100) + '%';
+  if (current >= questions.length) return renderScore();
+  const item = questions[current];
+  answered = false;
+  quizArea.innerHTML = `
+    <div class="card">
+      <div class="qnum">Question ${current + 1} / ${questions.length}</div>
+      <div class="qtext">${item.q}</div>
+      <div id="opts"></div>
+      <div class="explain" id="explain">${item.explain}</div>
+      <button class="nextbtn" id="nextBtn" disabled>Suivant →</button>
+    </div>`;
+  const optsDiv = document.getElementById('opts');
+  item.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt;
+    btn.onclick = () => selectOption(i, btn);
+    optsDiv.appendChild(btn);
+  });
+}
+
+function selectOption(i, btn) {
+  if (answered) return;
+  answered = true;
+  const item = questions[current];
+  const allOpts = document.querySelectorAll('.opt');
+  allOpts.forEach((b, idx) => {
+    b.disabled = true;
+    if (idx === item.answer) b.classList.add('correct');
+    else if (idx === i) b.classList.add('incorrect');
+  });
+  if (i === item.answer) score++;
+  document.getElementById('explain').classList.add('show');
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('nextBtn').onclick = () => { current++; render(); };
+}
+
+function renderScore() {
+  progressBar.style.width = '100%';
+  const pct = Math.round(score / questions.length * 100);
+  let emoji = '💪', msg = "Continue, ça va venir !";
+  if (pct >= 90) { emoji = '🎉'; msg = "Excellent, les bases sont solides !"; }
+  else if (pct >= 70) { emoji = '👏'; msg = "Très bien, presque parfait."; }
+  else if (pct >= 50) { emoji = '🙂'; msg = "Pas mal, relis la leçon une fois."; }
+  quizArea.innerHTML = `
+    <div class="card score">
+      <div class="emoji">${emoji}</div>
+      <h2>${score} / ${questions.length}</h2>
+      <p>${msg}</p>
+      <button class="restart" onclick="restart()">Recommencer</button>
+    </div>`;
+}
+
+function restart() { current = 0; score = 0; render(); }
+render();
+</script>
+</body>
+</html>

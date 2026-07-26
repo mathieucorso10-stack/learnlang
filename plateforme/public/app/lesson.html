@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>LearnLang — Leçon</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../style.css">
+<style>
+  .lesson-head{padding-bottom:22px; border-bottom:1px solid rgba(43,33,29,.07); margin-bottom:22px;}
+  .cta-row{display:flex; justify-content:center; margin-top:28px;}
+  .cta-row button{font-size:1.05rem; padding:16px 34px;}
+
+  .quiz-top{display:flex; align-items:center; gap:16px; margin-bottom:24px;}
+  .quiz-ring-wrap{position:relative; width:52px; height:52px; flex-shrink:0;}
+  .quiz-ring-wrap .lbl{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.78rem;}
+  .qtext{font-family:'Fraunces',serif; font-size:1.3rem; font-weight:600; margin-bottom:20px; line-height:1.35;}
+  .typed-input{width:100%;margin-bottom:14px;font-size:1.1rem;}
+  .score-emoji{font-size:4rem;margin-bottom:10px; animation:pop .5s var(--ease-bounce) both;}
+  @keyframes pop{from{transform:scale(.4); opacity:0;} to{transform:scale(1); opacity:1;}}
+  .score-num{font-family:'Fraunces',serif; font-size:3rem; font-weight:800;}
+  .confetti-piece{position:fixed; top:-20px; z-index:200; border-radius:2px; pointer-events:none; will-change:transform,opacity;}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="brand">🌐 LearnLang</div>
+  <div><a href="index.html">← Tableau de bord</a></div>
+</nav>
+<div class="wrap">
+  <div id="lessonView">
+    <div class="card enter">
+      <div class="lesson-head">
+        <h1 id="lessonTitle">Chargement…</h1>
+        <div class="sub" id="lessonLang" style="margin-bottom:0"></div>
+      </div>
+      <div class="markdown" id="lessonContent"></div>
+      <div class="cta-row">
+        <button id="startQuizBtn">🎯 Faire le quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="quizView" style="display:none">
+    <div class="card enter">
+      <div class="quiz-top">
+        <div class="quiz-ring-wrap">
+          <svg width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(43,33,29,.08)" stroke-width="6"/>
+            <circle id="quizRingProgress" cx="26" cy="26" r="22" fill="none" stroke="#d9502f" stroke-width="6"
+              stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2"
+              transform="rotate(-90 26 26)" style="transition:stroke-dashoffset .5s cubic-bezier(.22,1,.36,1)"/>
+          </svg>
+          <div class="lbl" id="quizRingLabel">0%</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-weight:700;" id="quizCounter"></div>
+          <div class="muted">Continue, tu progresses !</div>
+        </div>
+      </div>
+      <div id="quizBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../vendor/marked.umd.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const lessonId = params.get('id');
+
+async function api(url, opts) {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (res.status === 401) { window.location.href = '/'; return null; }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Erreur');
+  return data;
+}
+
+let items = [];
+let idx = 0;
+let score = 0;
+let answered = false;
+
+async function loadLesson() {
+  const lesson = await api(`/api/lessons/${lessonId}`);
+  if (!lesson) return;
+  document.getElementById('lessonTitle').textContent = lesson.title;
+  document.getElementById('lessonLang').textContent = lesson.languageName;
+  document.getElementById('lessonContent').innerHTML = marked.parse(lesson.content_md);
+}
+
+function setQuizRing(pct) {
+  const c = 138.2;
+  document.getElementById('quizRingProgress').style.strokeDashoffset = c - (pct / 100) * c;
+  document.getElementById('quizRingLabel').textContent = Math.round(pct) + '%';
+}
+
+async function startQuiz(force) {
+  const data = await api(`/api/lessons/${lessonId}/quiz?limit=10${force ? '&force=true' : ''}`);
+  items = data.items;
+  idx = 0;
+  score = 0;
+  answered = false;
+
+  if (items.length === 0) {
+    document.getElementById('lessonView').style.display = 'none';
+    document.getElementById('quizView').style.display = 'block';
+    document.getElementById('quizBody').innerHTML = `
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:2.6rem;margin-bottom:8px;">🌤️</div>
+        <p>Rien à réviser dans cette leçon pour l'instant — reviens plus tard, ou entraîne-toi quand même.</p>
+        <div class="row" style="justify-content:center">
+          <button id="forceBtn">S'entraîner quand même</button>
+          <a class="btn secondary" href="index.html">Retour au tableau de bord</a>
+        </div>
+      </div>
+    `;
+    document.getElementById('forceBtn').addEventListener('click', () => startQuiz(true));
+    return;
+  }
+
+  document.getElementById('lessonView').style.display = 'none';
+  document.getElementById('quizView').style.display = 'block';
+  setQuizRing(0);
+  renderQuestion();
+}
+
+function renderQuestion() {
+  setQuizRing((idx / items.length) * 100);
+  document.getElementById('quizCounter').textContent = `Question ${idx + 1} / ${items.length}`;
+  const item = items[idx];
+  answered = false;
+  const body = document.getElementById('quizBody');
+
+  if (item.type === 'mcq') {
+    body.innerHTML = `
+      <div class="qtext">${item.prompt}</div>
+      <div id="opts"></div>
+      <div id="feedback"></div>
+      <button id="nextBtn" disabled style="margin-top:16px">Suivant →</button>
+    `;
+    const optsDiv = document.getElementById('opts');
+    item.options.forEach((opt) => {
+      const btn = document.createElement('button');
+      btn.className = 'opt';
+      btn.textContent = opt;
+      btn.onclick = () => submitAnswer(opt, btn);
+      optsDiv.appendChild(btn);
+    });
+  } else {
+    body.innerHTML = `
+      <div class="qtext">${item.prompt}</div>
+      <input type="text" id="typedAnswer" class="typed-input" placeholder="Écris ta réponse…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="row">
+        <button id="submitTyped">Valider →</button>
+      </div>
+      <div id="feedback"></div>
+      <button id="nextBtn" disabled style="margin-top:16px">Suivant →</button>
+    `;
+    const input = document.getElementById('typedAnswer');
+    input.focus();
+    const submit = () => submitAnswer(input.value, null);
+    document.getElementById('submitTyped').addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  }
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    idx++;
+    if (idx >= items.length) return renderScore();
+    renderQuestion();
+  });
+}
+
+async function submitAnswer(answer, btnEl) {
+  if (answered) return;
+  answered = true;
+  const item = items[idx];
+  const result = await api(`/api/questions/${item.questionId}/answer`, {
+    method: 'POST',
+    body: JSON.stringify({ answer }),
+  });
+
+  if (result.correct) score++;
+
+  const feedback = document.getElementById('feedback');
+  if (item.type === 'mcq') {
+    document.querySelectorAll('.opt').forEach((b) => (b.disabled = true));
+    if (btnEl) {
+      if (result.correct) btnEl.classList.add('correct');
+      else btnEl.classList.add('incorrect');
+    }
+    if (!result.correct) {
+      document.querySelectorAll('.opt').forEach((b) => {
+        if (b.textContent === result.correctAnswer) b.classList.add('correct');
+      });
+    }
+  } else {
+    document.getElementById('typedAnswer').disabled = true;
+    document.getElementById('submitTyped').disabled = true;
+  }
+
+  let msg;
+  if (result.correct && result.exact) msg = `<div class="explain" style="border-left:4px solid var(--good)">✅ Correct ! ${result.explanation}</div>`;
+  else if (result.correct && !result.exact) msg = `<div class="explain" style="border-left:4px solid var(--warn)">🟡 Presque ! Attention aux accents/tildes — la réponse exacte est « ${result.correctAnswer} ». ${result.explanation}</div>`;
+  else msg = `<div class="explain" style="border-left:4px solid var(--bad)">❌ Pas tout à fait. La bonne réponse est « ${result.correctAnswer} ». ${result.explanation}</div>`;
+  feedback.innerHTML = msg;
+
+  document.getElementById('nextBtn').disabled = false;
+}
+
+function confettiBurst() {
+  const colors = ['#d9502f', '#f2a922', '#3e8e5a', '#7a4869', '#b83a1f'];
+  const count = 60;
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const size = 6 + Math.random() * 8;
+    piece.style.width = size + 'px';
+    piece.style.height = (size * (0.4 + Math.random() * 0.8)) + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.left = Math.random() * 100 + 'vw';
+    const duration = 2200 + Math.random() * 1400;
+    const rotateEnd = 360 * (2 + Math.random() * 3) * (Math.random() < 0.5 ? -1 : 1);
+    const drift = (Math.random() - 0.5) * 200;
+    document.body.appendChild(piece);
+    piece.animate(
+      [
+        { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+        { transform: `translate(${drift}px, 100vh) rotate(${rotateEnd}deg)`, opacity: 0.9 },
+      ],
+      { duration, easing: 'cubic-bezier(.22,.61,.36,1)', delay: Math.random() * 300 }
+    );
+    setTimeout(() => piece.remove(), duration + 400);
+  }
+}
+
+function renderScore() {
+  setQuizRing(100);
+  document.getElementById('quizCounter').textContent = 'Terminé !';
+  const pct = Math.round(score / items.length * 100);
+  let emoji = '💪', txt = 'Continue, ça va venir !';
+  if (pct >= 90) { emoji = '🎉'; txt = 'Excellent !'; }
+  else if (pct >= 70) { emoji = '👏'; txt = 'Très bien !'; }
+  else if (pct >= 50) { emoji = '🙂'; txt = 'Pas mal, encore un effort.'; }
+  document.getElementById('quizBody').innerHTML = `
+    <div style="text-align:center">
+      <div class="score-emoji">${emoji}</div>
+      <div class="score-num">${score} / ${items.length}</div>
+      <p class="muted" style="margin-top:6px">${txt}</p>
+      <div class="row" style="justify-content:center;margin-top:20px">
+        <button id="againBtn">Refaire</button>
+        <a class="btn secondary" href="index.html">Retour au tableau de bord</a>
+      </div>
+    </div>
+  `;
+  document.getElementById('againBtn').addEventListener('click', () => startQuiz(false));
+  if (pct >= 70) confettiBurst();
+}
+
+document.getElementById('startQuizBtn').addEventListener('click', () => startQuiz(false));
+loadLesson();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "learnlang",
+  "version": "1.0.0",
+  "description": "Plateforme de cours de langues multi-utilisateurs, multi-langues, avec répétition espacée",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed/seed_spanish.js",
+    "seed:extend": "node seed/extend_courses.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "marked": "^18.0.7"
+  }
+}

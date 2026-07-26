@@ -1,0 +1,6 @@
+plateforme/node_modules/
+plateforme/data/*.db
+plateforme/data/*.db-shm
+plateforme/data/*.db-wal
+plateforme/.env
+.DS_Store

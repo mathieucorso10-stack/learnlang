@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Quiz — Ser vs Estar</title>
+<style>
+  :root{--bg:#fdf6ec; --card:#ffffff; --accent:#d94f30; --accent2:#f2a922; --good:#3e8e5a; --bad:#c0392b; --text:#3a2e2a; --muted:#8a7a72;}
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:linear-gradient(135deg,#fdf6ec,#fbe8d3); color:var(--text); margin:0; padding:32px 16px; min-height:100vh;}
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-size:1.5rem;margin-bottom:4px;}
+  .sub{color:var(--muted);margin-bottom:24px;}
+  .card{background:var(--card); border-radius:16px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.08); margin-bottom:16px;}
+  .qnum{font-size:.85rem;color:var(--accent);font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;}
+  .qtext{font-size:1.15rem;font-weight:600;margin-bottom:16px;}
+  .opt{display:block; width:100%; text-align:left; padding:12px 16px; margin-bottom:10px; border-radius:10px; border:2px solid #eee2d5; background:#fffdf9; cursor:pointer; font-size:1rem; color:var(--text); transition:all .15s;}
+  .opt:hover{border-color:var(--accent2);}
+  .opt.correct{border-color:var(--good);background:#e7f5ec;}
+  .opt.incorrect{border-color:var(--bad);background:#fbe9e7;}
+  .explain{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f6f0e6;font-size:.95rem;display:none;}
+  .explain.show{display:block;}
+  .nextbtn, .restart{background:var(--accent); color:white; border:none; padding:12px 22px; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; margin-top:8px;}
+  .nextbtn:disabled{background:#e0d3c4;cursor:not-allowed;}
+  .progress{height:8px;background:#eee2d5;border-radius:4px;overflow:hidden;margin-bottom:24px;}
+  .progress-bar{height:100%;background:var(--accent2);width:0%;transition:width .3s;}
+  .score{text-align:center;}
+  .score h2{font-size:2.2rem;margin-bottom:8px;}
+  .score p{color:var(--muted);}
+  .emoji{font-size:3rem;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚖️ Quiz — Ser vs Estar</h1>
+  <div class="sub">Leçon 4 · 10 questions · le point le plus important du cours !</div>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div id="quizArea"></div>
+</div>
+
+<script>
+const questions = [
+  { q:"Pour dire où se trouve une ville (même de façon permanente), on utilise :", options:["ser","estar"], answer:1,
+    explain:"La localisation utilise toujours ESTAR : Madrid está en España." },
+  { q:"Pour dire ta nationalité, on utilise :", options:["ser","estar"], answer:0,
+    explain:"L'identité/nationalité est permanente → SER : Soy francés." },
+  { q:"« Estoy cansado » signifie :", options:["Je suis fatigant (nature)","Je suis fatigué (en ce moment)"], answer:1,
+    explain:"ESTAR exprime un état temporaire : la fatigue du moment." },
+  { q:"« Es aburrido » (avec SER) veut dire :", options:["Il est ennuyeux (caractère)","Il s'ennuie (en ce moment)"], answer:0,
+    explain:"Avec SER, aburrido décrit un trait de caractère permanent." },
+  { q:"« Está aburrido » (avec ESTAR) veut dire :", options:["Il est ennuyeux (caractère)","Il s'ennuie (en ce moment)"], answer:1,
+    explain:"Avec ESTAR, aburrido décrit un état ponctuel : il s'ennuie maintenant." },
+  { q:"Conjugue ESTAR à la 1re personne (yo) :", options:["soy","estoy","es","está"], answer:1,
+    explain:"yo estoy — verbe irrégulier à apprendre par cœur, très fréquent." },
+  { q:"« La puerta está abierta » veut dire :", options:["La porte est ouverte (résultat/état)","La porte appartient à quelqu'un"], answer:0,
+    explain:"Un état résultant d'une action (on l'a ouverte) → ESTAR." },
+  { q:"Pour donner l'heure (« Il est trois heures »), on utilise :", options:["ser","estar"], answer:0,
+    explain:"L'heure et la date se disent toujours avec SER : Son las tres." },
+  { q:"« Está listo » signifie :", options:["Il est intelligent","Il est prêt"], answer:1,
+    explain:"listo + ESTAR = prêt. listo + SER = intelligent. Deux sens différents !" },
+  { q:"« Está rico » à propos d'un plat que tu manges veut dire :", options:["Il est riche (argent)","C'est délicieux"], answer:1,
+    explain:"rico + ESTAR (à propos de nourriture) = délicieux. rico + SER = riche (argent). Encore un adjectif qui change de sens !" }
+];
+
+let current = 0, score = 0, answered = false;
+const quizArea = document.getElementById('quizArea');
+const progressBar = document.getElementById('progressBar');
+
+function render() {
+  progressBar.style.width = (current / questions.length * 100) + '%';
+  if (current >= questions.length) return renderScore();
+  const item = questions[current];
+  answered = false;
+  quizArea.innerHTML = `
+    <div class="card">
+      <div class="qnum">Question ${current + 1} / ${questions.length}</div>
+      <div class="qtext">${item.q}</div>
+      <div id="opts"></div>
+      <div class="explain" id="explain">${item.explain}</div>
+      <button class="nextbtn" id="nextBtn" disabled>Suivant →</button>
+    </div>`;
+  const optsDiv = document.getElementById('opts');
+  item.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt;
+    btn.onclick = () => selectOption(i, btn);
+    optsDiv.appendChild(btn);
+  });
+}
+
+function selectOption(i, btn) {
+  if (answered) return;
+  answered = true;
+  const item = questions[current];
+  const allOpts = document.querySelectorAll('.opt');
+  allOpts.forEach((b, idx) => {
+    b.disabled = true;
+    if (idx === item.answer) b.classList.add('correct');
+    else if (idx === i) b.classList.add('incorrect');
+  });
+  if (i === item.answer) score++;
+  document.getElementById('explain').classList.add('show');
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('nextBtn').onclick = () => { current++; render(); };
+}
+
+function renderScore() {
+  progressBar.style.width = '100%';
+  const pct = Math.round(score / questions.length * 100);
+  let emoji = '💪', msg = "Ce point est dur, révise-le encore un peu !";
+  if (pct >= 90) { emoji = '🎉'; msg = "Bravo, tu maîtrises le point le plus dur du cours !"; }
+  else if (pct >= 70) { emoji = '👏'; msg = "Très bien, presque parfait."; }
+  else if (pct >= 50) { emoji = '🙂'; msg = "Pas mal, relis la leçon une fois."; }
+  quizArea.innerHTML = `
+    <div class="card score">
+      <div class="emoji">${emoji}</div>
+      <h2>${score} / ${questions.length}</h2>
+      <p>${msg}</p>
+      <button class="restart" onclick="restart()">Recommencer</button>
+    </div>`;
+}
+
+function restart() { current = 0; score = 0; render(); }
+render();
+</script>
+</body>
+</html>
