@@ -130,11 +130,18 @@ async function initSchema() {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS user_languages (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      language_id INTEGER NOT NULL REFERENCES languages(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, language_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_lessons_lang ON lessons(language_id);
     CREATE INDEX IF NOT EXISTS idx_questions_lesson ON questions(lesson_id);
     CREATE INDEX IF NOT EXISTS idx_progress_user ON progress(user_id);
     CREATE INDEX IF NOT EXISTS idx_progress_question ON progress(question_id);
     CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_languages_user ON user_languages(user_id);
   `;
 
   if (process.env.PGMEM_TEST === '1') {
@@ -144,6 +151,20 @@ async function initSchema() {
   }
 
   await pool.query(schemaSql);
+
+  // Migration en douceur : la première fois que la table user_languages existe
+  // (elle est vide), on donne accès à toutes les langues existantes à tous les
+  // étudiants existants, pour ne rien casser pour ceux qui utilisaient déjà la
+  // plateforme avant cette fonctionnalité. Après ça, c'est l'admin qui gère.
+  const countRow = await pool.query('SELECT COUNT(*) c FROM user_languages');
+  if (Number(countRow.rows[0].c) === 0) {
+    await pool.query(`
+      INSERT INTO user_languages (user_id, language_id)
+      SELECT u.id, l.id FROM users u, languages l WHERE u.role = 'student'
+      ON CONFLICT DO NOTHING
+    `);
+  }
+
   schemaInitialized = true;
 }
 

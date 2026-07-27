@@ -35,8 +35,13 @@
   }
   .lesson-item.is-mastered .lesson-num{background:var(--good-soft); color:var(--good-strong);}
   .lesson-item.is-due .lesson-num{background:var(--bad-soft); color:var(--bad);}
+  .lesson-item.is-started .lesson-num{background:var(--amber-soft); color:var(--amber-strong);}
   .lesson-left{display:flex;align-items:center;gap:14px;min-width:0;}
+  .lesson-main{display:flex;flex-direction:column;min-width:0;}
   .lesson-title-text{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .lesson-sub{font-size:.78rem;color:var(--ink-faint);}
+  .empty-state{text-align:center;padding:40px 20px;}
+  .empty-state .emoji{font-size:2.4rem;margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -121,9 +126,20 @@ async function load() {
   container.innerHTML = '';
   let grandTotalDue = 0;
 
+  if (languages.length === 0) {
+    container.innerHTML = `
+      <div class="card empty-state enter">
+        <div class="emoji">📭</div>
+        <h2>Aucune langue disponible pour l'instant</h2>
+        <p class="muted">Ton administrateur ne t'a pas encore donné accès à un cours.<br>Demande-lui de t'assigner une langue depuis son panel.</p>
+      </div>`;
+    return;
+  }
+
   for (const lang of languages) {
     const lessons = await api(`/api/languages/${lang.id}/lessons`);
     const totalMastered = lessons.reduce((s, l) => s + l.masteredCount, 0);
+    const totalSeen = lessons.reduce((s, l) => s + l.seenCount, 0);
     const totalQ = lessons.reduce((s, l) => s + l.totalQuestions, 0);
     const totalDue = lessons.reduce((s, l) => s + l.dueCount, 0);
     grandTotalDue += totalDue;
@@ -136,7 +152,7 @@ async function load() {
         ${ring(pct, '#d9502f')}
         <div style="flex:1;min-width:0;">
           <h2 class="lang-title"><span class="lang-flag">${lang.flag_emoji}</span> ${lang.name}</h2>
-          <div class="muted">${totalMastered}/${totalQ} questions maîtrisées</div>
+          <div class="muted">${totalMastered}/${totalQ} maîtrisées · ${totalSeen}/${totalQ} vues</div>
         </div>
         <div>${totalDue > 0 ? pill('🔥 ' + totalDue + ' à réviser', 'due') : pill('✓ à jour', 'mastered')}</div>
       </div>
@@ -147,12 +163,20 @@ async function load() {
       const li = document.createElement('li');
       const a = document.createElement('a');
       const lpct = l.totalQuestions ? Math.round((l.masteredCount / l.totalQuestions) * 100) : 0;
-      a.className = 'lesson-item' + (l.dueCount > 0 ? ' is-due' : lpct >= 80 ? ' is-mastered' : '');
+      let statusClass = '';
+      let statusLabel = 'Pas commencé';
+      if (lpct >= 80) { statusClass = ' is-mastered'; statusLabel = 'Maîtrisé'; }
+      else if (l.seenCount > 0) { statusClass = ' is-started'; statusLabel = 'En cours'; }
+      if (l.dueCount > 0) statusClass = ' is-due';
+      a.className = 'lesson-item' + statusClass;
       a.href = `lesson.html?id=${l.id}`;
       a.innerHTML = `
         <span class="lesson-left">
           <span class="lesson-num">${idx + 1}</span>
-          <span class="lesson-title-text">${l.title}</span>
+          <span class="lesson-main">
+            <span class="lesson-title-text">${l.title}</span>
+            <span class="lesson-sub">${statusLabel} · ${l.seenCount}/${l.totalQuestions} vues</span>
+          </span>
         </span>
         <span style="display:flex;gap:8px;flex-shrink:0;">${l.dueCount > 0 ? pill(l.dueCount + ' due', 'due') : ''}${pill(lpct + '%', lpct >= 80 ? 'mastered' : '')}</span>
       `;

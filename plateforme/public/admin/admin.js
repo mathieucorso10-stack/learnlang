@@ -434,21 +434,29 @@ async function renderUsers() {
   const panel = document.getElementById('tab-users');
   const users = await api('/api/admin/users');
   const me = await api('/api/me');
+  const languages = await api('/api/admin/languages');
 
   panel.innerHTML = `
     <h1 style="margin-bottom:24px">Utilisateurs</h1>
     <div class="card">
       <h2>Comptes existants</h2>
       <table class="admin-table">
-        <tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Créé le</th><th></th></tr>
+        <tr><th>Nom</th><th>Identifiant</th><th>Rôle</th><th>Langues</th><th></th></tr>
         ${users
           .map(
             (u) => `<tr>
               <td>${escapeHtml(u.display_name)}</td><td>${escapeHtml(u.username)}</td>
               <td><span class="pill ${u.role === 'admin' ? 'mastered' : ''}">${u.role}</span></td>
-              <td class="muted">${u.created_at}</td>
+              <td>${
+                u.role === 'admin'
+                  ? '<span class="muted">toutes (admin)</span>'
+                  : u.languages.length
+                  ? u.languages.map((l) => `<span title="${escapeHtml(l.name)}">${l.flag_emoji}</span>`).join(' ')
+                  : '<span class="pill due">aucune assignée</span>'
+              }</td>
               <td>
                 <button class="secondary" data-progress="${u.id}">Progression</button>
+                ${u.role === 'admin' ? '' : `<button class="secondary" data-langs="${u.id}">Langues</button>`}
                 <button class="secondary" data-reset="${u.id}">Reset mdp</button>
                 <button class="secondary" data-toggle-role="${u.id}" data-role="${u.role}">${u.role === 'admin' ? 'Rétrograder' : 'Promouvoir admin'}</button>
                 ${u.id === me.id ? '' : `<button class="danger" data-del-user="${u.id}">Supprimer</button>`}
@@ -457,7 +465,7 @@ async function renderUsers() {
           )
           .join('')}
       </table>
-      <div id="userProgressPanel"></div>
+      <div id="userSubPanel"></div>
     </div>
     <div class="card">
       <h2>Ajouter un utilisateur</h2>
@@ -469,14 +477,31 @@ async function renderUsers() {
           <select id="newUserRole"><option value="student">student</option><option value="admin">admin</option></select>
         </div>
       </div>
+      <div class="field" id="newUserLangsField">
+        <label>Langues accessibles à cette personne (uniquement pour un compte "student" — c'est toi qui choisis, pas elle)</label>
+        <div class="row">
+          ${languages
+            .map(
+              (l) => `<label style="display:flex;align-items:center;gap:6px;font-weight:600;text-transform:none;letter-spacing:0">
+                <input type="checkbox" class="new-user-lang" value="${l.id}"> ${l.flag_emoji} ${escapeHtml(l.name)}
+              </label>`
+            )
+            .join('')}
+        </div>
+      </div>
       <button id="addUserBtn">Créer l'utilisateur</button>
       <div class="error" id="userErr"></div>
     </div>
   `;
 
+  document.getElementById('newUserRole').addEventListener('change', (e) => {
+    document.getElementById('newUserLangsField').style.display = e.target.value === 'admin' ? 'none' : 'block';
+  });
+
   document.getElementById('addUserBtn').addEventListener('click', async () => {
     const errEl = document.getElementById('userErr');
     errEl.textContent = '';
+    const language_ids = Array.from(document.querySelectorAll('.new-user-lang:checked')).map((c) => Number(c.value));
     try {
       await api('/api/admin/users', {
         method: 'POST',
@@ -485,6 +510,7 @@ async function renderUsers() {
           username: document.getElementById('newUserUsername').value,
           password: document.getElementById('newUserPassword').value,
           role: document.getElementById('newUserRole').value,
+          language_ids,
         }),
       });
       renderUsers();
@@ -518,21 +544,70 @@ async function renderUsers() {
     })
   );
 
+  panel.querySelectorAll('[data-langs]').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      const userId = btn.dataset.langs;
+      const user = users.find((u) => u.id == userId);
+      const assigned = await api(`/api/admin/users/${userId}/languages`);
+      document.getElementById('userSubPanel').innerHTML = `
+        <div class="card" style="margin-top:16px;background:var(--card-soft)">
+          <h3>Langues accessibles pour ${escapeHtml(user.display_name)}</h3>
+          <p class="muted">Coche les langues que cette personne peut voir sur son tableau de bord — elle ne verra que celles-ci, pas les autres.</p>
+          <div class="row">
+            ${languages
+              .map(
+                (l) => `<label style="display:flex;align-items:center;gap:6px;font-weight:600">
+                  <input type="checkbox" class="edit-user-lang" value="${l.id}" ${assigned.includes(l.id) ? 'checked' : ''}> ${l.flag_emoji} ${escapeHtml(l.name)}
+                </label>`
+              )
+              .join('')}
+          </div>
+          <button id="saveUserLangsBtn" style="margin-top:12px">Enregistrer</button>
+          <span class="success" id="userLangsOk" style="display:none;margin-left:10px">Enregistré ✓</span>
+        </div>
+      `;
+      document.getElementById('saveUserLangsBtn').addEventListener('click', async () => {
+        const language_ids = Array.from(document.querySelectorAll('.edit-user-lang:checked')).map((c) => Number(c.value));
+        await api(`/api/admin/users/${userId}/languages`, { method: 'PUT', body: JSON.stringify({ language_ids }) });
+        document.getElementById('userLangsOk').style.display = 'inline';
+        renderUsers();
+      });
+    })
+  );
+
   panel.querySelectorAll('[data-progress]').forEach((btn) =>
     btn.addEventListener('click', async () => {
       const progress = await api(`/api/admin/users/${btn.dataset.progress}/progress`);
       const user = users.find((u) => u.id == btn.dataset.progress);
-      document.getElementById('userProgressPanel').innerHTML = `
-        <h3>Progression de ${escapeHtml(user.display_name)}</h3>
-        <table class="admin-table">
-          <tr><th>Langue</th><th>Leçon</th><th>Maîtrise</th></tr>
-          ${progress
-            .map((p) => {
-              const pct = p.totalQuestions ? Math.round((p.masteredCount / p.totalQuestions) * 100) : 0;
-              return `<tr><td>${escapeHtml(p.languageName)}</td><td>${escapeHtml(p.title)}</td><td>${pct}% (${p.masteredCount}/${p.totalQuestions})</td></tr>`;
-            })
-            .join('')}
-        </table>
+      document.getElementById('userSubPanel').innerHTML = `
+        <div class="card" style="margin-top:16px;background:var(--card-soft)">
+          <h3>Progression de ${escapeHtml(user.display_name)}</h3>
+          ${
+            progress.length === 0
+              ? '<p class="muted">Aucune langue assignée à cette personne pour l\'instant.</p>'
+              : `<table class="admin-table">
+                  <tr><th>Langue</th><th>Leçon</th><th>Statut</th><th>Vu</th><th>Maîtrisé</th><th>À réviser</th></tr>
+                  ${progress
+                    .map((p) => {
+                      const vuPct = p.totalQuestions ? Math.round((p.seenCount / p.totalQuestions) * 100) : 0;
+                      const masterPct = p.totalQuestions ? Math.round((p.masteredCount / p.totalQuestions) * 100) : 0;
+                      let statusPill;
+                      if (p.seenCount === 0) statusPill = '<span class="pill">pas commencé</span>';
+                      else if (masterPct >= 80) statusPill = '<span class="pill mastered">maîtrisé</span>';
+                      else statusPill = '<span class="pill amber">en cours</span>';
+                      return `<tr>
+                        <td>${p.languageFlag || ''} ${escapeHtml(p.languageName)}</td>
+                        <td>${escapeHtml(p.title)}</td>
+                        <td>${statusPill}</td>
+                        <td>${p.seenCount}/${p.totalQuestions} (${vuPct}%)</td>
+                        <td>${p.masteredCount}/${p.totalQuestions} (${masterPct}%)</td>
+                        <td>${p.dueCount > 0 ? `<span class="pill due">${p.dueCount}</span>` : '—'}</td>
+                      </tr>`;
+                    })
+                    .join('')}
+                </table>`
+          }
+        </div>
       `;
     })
   );

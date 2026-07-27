@@ -21,6 +21,14 @@ function ah(fn) {
 }
 
 app.use(express.json());
+
+// Empêche tout cache (navigateur, CDN) de servir une réponse API périmée —
+// la progression doit toujours refléter l'état réel de la base.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 app.use(
   session({
     name: 'learnlang.sid',
@@ -102,11 +110,37 @@ app.post(
 
 const MASTERY_REPETITIONS = 2; // nb de répétitions réussies pour considérer une question "maîtrisée"
 
+// Un admin voit toujours tout ; un étudiant ne voit que les langues que
+// l'admin lui a explicitement assignées (table user_languages).
+async function hasLanguageAccess(userId, role, languageId) {
+  if (role === 'admin') return true;
+  const row = await db.get('SELECT 1 as ok FROM user_languages WHERE user_id = ? AND language_id = ?', [
+    userId,
+    languageId,
+  ]);
+  return !!row;
+}
+
+async function languageIdOfLesson(lessonId) {
+  const row = await db.get('SELECT language_id FROM lessons WHERE id = ?', [lessonId]);
+  return row ? row.language_id : null;
+}
+
 app.get(
   '/api/languages',
   requireAuth,
   ah(async (req, res) => {
-    res.json(await db.all('SELECT id, code, name, flag_emoji FROM languages ORDER BY position, id'));
+    const me = await currentUser(req);
+    const rows =
+      me.role === 'admin'
+        ? await db.all('SELECT id, code, name, flag_emoji FROM languages ORDER BY position, id')
+        : await db.all(
+            `SELECT l.id, l.code, l.name, l.flag_emoji FROM languages l
+             JOIN user_languages ul ON ul.language_id = l.id
+             WHERE ul.user_id = ? ORDER BY l.position, l.id`,
+            [req.session.userId]
+          );
+    res.json(rows);
   })
 );
 
@@ -115,6 +149,10 @@ app.get(
   requireAuth,
   ah(async (req, res) => {
     const languageId = Number(req.params.id);
+    const me = await currentUser(req);
+    if (!(await hasLanguageAccess(req.session.userId, me.role, languageId))) {
+      return res.status(403).json({ error: "Cette langue n'est pas accessible pour ton compte." });
+    }
     const lessons = await db.all('SELECT id, title, position FROM lessons WHERE language_id = ? ORDER BY position, id', [
       languageId,
     ]);
@@ -123,6 +161,13 @@ app.get(
     const result = await Promise.all(
       lessons.map(async (l) => {
         const total = (await db.get('SELECT COUNT(*) c FROM questions WHERE lesson_id = ?', [l.id])).c;
+        const seen = (
+          await db.get(
+            `SELECT COUNT(*) c FROM progress p JOIN questions q ON q.id = p.question_id
+             WHERE q.lesson_id = ? AND p.user_id = ?`,
+            [l.id, req.session.userId]
+          )
+        ).c;
         const mastered = (
           await db.get(
             `SELECT COUNT(*) c FROM progress p JOIN questions q ON q.id = p.question_id
@@ -137,7 +182,13 @@ app.get(
             [l.id, req.session.userId, todayStr]
           )
         ).c;
-        return { ...l, totalQuestions: Number(total), masteredCount: Number(mastered), dueCount: Number(due) };
+        return {
+          ...l,
+          totalQuestions: Number(total),
+          seenCount: Number(seen),
+          masteredCount: Number(mastered),
+          dueCount: Number(due),
+        };
       })
     );
     res.json(result);
@@ -154,6 +205,10 @@ app.get(
       [req.params.id]
     );
     if (!lesson) return res.status(404).json({ error: 'Leçon introuvable.' });
+    const me = await currentUser(req);
+    if (!(await hasLanguageAccess(req.session.userId, me.role, lesson.languageId))) {
+      return res.status(403).json({ error: "Cette langue n'est pas accessible pour ton compte." });
+    }
     res.json(lesson);
   })
 );
@@ -167,6 +222,13 @@ app.get(
     const force = req.query.force === 'true';
     const userId = req.session.userId;
     const todayStr = srs.today();
+
+    const me = await currentUser(req);
+    const langId = await languageIdOfLesson(lessonId);
+    if (langId === null) return res.status(404).json({ error: 'Leçon introuvable.' });
+    if (!(await hasLanguageAccess(userId, me.role, langId))) {
+      return res.status(403).json({ error: "Cette langue n'est pas accessible pour ton compte." });
+    }
 
     const due = await db.all(
       `SELECT q.id, q.type, q.prompt, q.options_json, p.next_review_date
@@ -216,6 +278,12 @@ app.post(
 
     const question = await db.get('SELECT * FROM questions WHERE id = ?', [questionId]);
     if (!question) return res.status(404).json({ error: 'Question introuvable.' });
+
+    const me = await currentUser(req);
+    const langId = await languageIdOfLesson(question.lesson_id);
+    if (!(await hasLanguageAccess(userId, me.role, langId))) {
+      return res.status(403).json({ error: "Cette langue n'est pas accessible pour ton compte." });
+    }
 
     const accepted = JSON.parse(question.accepted_answers_json);
     const result = question.type === 'typed' ? checkTyped(answer, accepted) : checkMcq(answer, accepted);
@@ -270,7 +338,16 @@ app.get(
   requireAuth,
   ah(async (req, res) => {
     const userId = req.session.userId;
-    const languages = await db.all('SELECT id, name, flag_emoji FROM languages ORDER BY position, id');
+    const me = await currentUser(req);
+    const languages =
+      me.role === 'admin'
+        ? await db.all('SELECT id, name, flag_emoji FROM languages ORDER BY position, id')
+        : await db.all(
+            `SELECT l.id, l.name, l.flag_emoji FROM languages l
+             JOIN user_languages ul ON ul.language_id = l.id
+             WHERE ul.user_id = ? ORDER BY l.position, l.id`,
+            [userId]
+          );
     const todayStr = srs.today();
 
     const perLanguage = await Promise.all(
@@ -532,7 +609,18 @@ app.get(
   '/api/admin/users',
   requireAdmin,
   ah(async (req, res) => {
-    res.json(await db.all('SELECT id, username, display_name, role, created_at FROM users ORDER BY created_at'));
+    const users = await db.all('SELECT id, username, display_name, role, created_at FROM users ORDER BY created_at');
+    const result = await Promise.all(
+      users.map(async (u) => {
+        const langs = await db.all(
+          `SELECT l.flag_emoji, l.name FROM user_languages ul JOIN languages l ON l.id = ul.language_id
+           WHERE ul.user_id = ? ORDER BY l.position`,
+          [u.id]
+        );
+        return { ...u, languages: langs };
+      })
+    );
+    res.json(result);
   })
 );
 
@@ -540,7 +628,7 @@ app.post(
   '/api/admin/users',
   requireAdmin,
   ah(async (req, res) => {
-    const { username, password, display_name, role } = req.body || {};
+    const { username, password, display_name, role, language_ids } = req.body || {};
     if (!username || !password || !display_name) {
       return res.status(400).json({ error: 'username, password et display_name sont requis.' });
     }
@@ -551,7 +639,37 @@ app.post(
       'INSERT INTO users (username, password_hash, display_name, role, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
       [username, hash, display_name, role === 'admin' ? 'admin' : 'student', srs.nowTimestamp()]
     );
+    if (Array.isArray(language_ids)) {
+      for (const langId of language_ids) {
+        await db.run('INSERT INTO user_languages (user_id, language_id) VALUES (?, ?)', [info.id, langId]);
+      }
+    }
     res.json(await db.get('SELECT id, username, display_name, role, created_at FROM users WHERE id = ?', [info.id]));
+  })
+);
+
+app.get(
+  '/api/admin/users/:id/languages',
+  requireAdmin,
+  ah(async (req, res) => {
+    const rows = await db.all('SELECT language_id FROM user_languages WHERE user_id = ?', [req.params.id]);
+    res.json(rows.map((r) => r.language_id));
+  })
+);
+
+app.put(
+  '/api/admin/users/:id/languages',
+  requireAdmin,
+  ah(async (req, res) => {
+    const { language_ids } = req.body || {};
+    if (!Array.isArray(language_ids)) {
+      return res.status(400).json({ error: 'language_ids doit être un tableau.' });
+    }
+    await db.run('DELETE FROM user_languages WHERE user_id = ?', [req.params.id]);
+    for (const langId of language_ids) {
+      await db.run('INSERT INTO user_languages (user_id, language_id) VALUES (?, ?)', [req.params.id, langId]);
+    }
+    res.json({ ok: true });
   })
 );
 
@@ -593,13 +711,25 @@ app.get(
   requireAdmin,
   ah(async (req, res) => {
     const userId = req.params.id;
+    const todayStr = srs.today();
     const lessons = await db.all(
-      `SELECT lessons.id, lessons.title, languages.name as "languageName"
-       FROM lessons JOIN languages ON languages.id = lessons.language_id ORDER BY languages.position, lessons.position`
+      `SELECT lessons.id, lessons.title, languages.name as "languageName", languages.flag_emoji as "languageFlag"
+       FROM lessons
+       JOIN languages ON languages.id = lessons.language_id
+       JOIN user_languages ul ON ul.language_id = languages.id AND ul.user_id = ?
+       ORDER BY languages.position, lessons.position`,
+      [userId]
     );
     const result = await Promise.all(
       lessons.map(async (l) => {
         const total = (await db.get('SELECT COUNT(*) c FROM questions WHERE lesson_id = ?', [l.id])).c;
+        const seen = (
+          await db.get(
+            `SELECT COUNT(*) c FROM progress p JOIN questions q ON q.id = p.question_id
+             WHERE q.lesson_id = ? AND p.user_id = ?`,
+            [l.id, userId]
+          )
+        ).c;
         const mastered = (
           await db.get(
             `SELECT COUNT(*) c FROM progress p JOIN questions q ON q.id = p.question_id
@@ -607,7 +737,20 @@ app.get(
             [l.id, userId, MASTERY_REPETITIONS]
           )
         ).c;
-        return { ...l, totalQuestions: Number(total), masteredCount: Number(mastered) };
+        const due = (
+          await db.get(
+            `SELECT COUNT(*) c FROM progress p JOIN questions q ON q.id = p.question_id
+             WHERE q.lesson_id = ? AND p.user_id = ? AND p.next_review_date <= ?`,
+            [l.id, userId, todayStr]
+          )
+        ).c;
+        return {
+          ...l,
+          totalQuestions: Number(total),
+          seenCount: Number(seen),
+          masteredCount: Number(mastered),
+          dueCount: Number(due),
+        };
       })
     );
     res.json(result);

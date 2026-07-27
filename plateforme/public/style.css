@@ -191,7 +191,8 @@ nav.topbar a:hover{color:var(--accent-strong);}
 .success{color:var(--good-strong);font-size:.88rem;margin-top:8px;font-weight:600;}
 .muted{color:var(--ink-soft);font-size:.85rem;}
 
-table.admin-table{width:100%;border-collapse:collapse;}
+.card:has(table.admin-table){overflow-x:auto;}
+table.admin-table{width:100%;border-collapse:collapse;min-width:520px;}
 table.admin-table th{padding:10px 12px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);border-bottom:2px solid rgba(43,33,29,.08);}
 table.admin-table td{padding:12px;border-bottom:1px solid rgba(43,33,29,.06);font-size:.92rem;vertical-align:middle;}
 table.admin-table tr:hover td{background:rgba(43,33,29,.015);}
