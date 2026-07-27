@@ -163,18 +163,24 @@ adresse publique temporaire du type `https://un-nom.trycloudflare.com`.
 
 ### Côté étudiant (`/app/`)
 
-Tableau de bord avec une carte par langue (anneau de progression, leçons
-listées avec leur numéro et leur taux de maîtrise). On clique sur une
-leçon pour lire le cours puis lancer le quiz — les questions déjà vues et
-dues reviennent en priorité, les nouvelles complètent jusqu'à 10 questions
-par session.
+Tableau de bord avec une carte **par langue assignée** (anneau de
+progression, leçons listées avec leur numéro, leur statut — pas commencé /
+en cours / maîtrisé — et le nombre de questions vues/maîtrisées). Un
+étudiant ne voit que les langues que l'admin lui a données ; s'il n'en a
+aucune, un message clair l'indique. On clique sur une leçon pour lire le
+cours puis lancer le quiz — les questions déjà vues et dues reviennent en
+priorité, les nouvelles complètent jusqu'à 10 questions par session.
 
 ### Côté admin (`/admin/`)
 
 Panel avec sidebar : vue d'ensemble (stats, questions les plus ratées),
 gestion des langues, des leçons (contenu en markdown), des questions (QCM
-ou saisie libre), et des utilisateurs (créer, changer le rôle, réinitialiser
-un mot de passe, voir la progression de chacun).
+ou saisie libre), et des utilisateurs. Pour les utilisateurs : créer un
+compte en choisissant ses langues accessibles (case à cocher par langue —
+**c'est toujours l'admin qui décide**, pas l'étudiant), modifier ces
+langues à tout moment via le bouton « Langues », changer le rôle,
+réinitialiser un mot de passe, et voir la progression détaillée de
+chacun (statut, questions vues, maîtrisées, dues — par leçon).
 
 ## 🗂️ Structure du projet
 
